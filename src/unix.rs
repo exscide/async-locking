@@ -2,8 +2,8 @@ use rustix::fs::{ flock, FlockOperation };
 use std::os::unix::io::AsFd;
 
 
-pub trait AsDescriptor: AsFd {}
-impl<T: AsFd> AsDescriptor for T {}
+pub trait AsDescriptor: AsFd + Send + 'static {}
+impl<T: AsFd + Send + 'static> AsDescriptor for T {}
 
 
 pub(crate) fn lock_shared<F: AsFd>(file: F) -> std::io::Result<F> {

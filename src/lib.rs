@@ -1,4 +1,7 @@
-//! Async implementation of file locking using flock on unix and LockFileEx on windows.
+// TODO: tests
+// TODO: document platform specific behavior
+
+//! An async implementation of file locking using flock on unix and LockFileEx on windows.
 //! 
 //! ## Feature flags
 //! By default, the `tokio` feature is active.
@@ -29,12 +32,12 @@ mod unix;
 use unix::*;
 
 
-/// An extension trait for any [std::fs::File] like type that provides async file locking methods.
+/// An extension trait for any [File](std::fs::File) like type that provides async file locking methods.
 pub trait AsyncLockFileExt: AsDescriptor {
 	/// Asynchronously wait to obtain a shared lock
-	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized;
+	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
 	/// Asynchronously wait to obtain an exclusive lock
-	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized;
+	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
 	/// Try to obtain a shared lock
 	fn try_lock_shared(&self) -> std::io::Result<()>;
 	/// Try to obtain an exclusive lock
@@ -43,7 +46,7 @@ pub trait AsyncLockFileExt: AsDescriptor {
 
 
 
-impl<T: AsDescriptor + Send + 'static> AsyncLockFileExt for T {
+impl<T: AsDescriptor> AsyncLockFileExt for T {
 	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send {
 		async move {
 			#[cfg(feature = "tokio")]
@@ -92,6 +95,9 @@ impl<T: AsDescriptor + Send + 'static> AsyncLockFileExt for T {
 }
 
 
+/// A guard that holds a locked file.
+/// 
+/// It automatically unlocks the file on drop, but it can be manually unlocked using [Lock::unlock].
 pub struct Lock<T: AsDescriptor> {
 	file: T,
 }
@@ -101,15 +107,31 @@ impl<T: AsDescriptor> Lock<T> {
 		Self { file }
 	}
 
-	pub fn unlock(self) -> T {
-		let _ = self.unlock_ref();
-		let file = unsafe { std::mem::transmute_copy(&self.file) };
+	/// Asynchronously unlock the file
+	pub async fn unlock(self) -> std::io::Result<T> {
+		#[cfg(feature = "tokio")]
+		let spawn = tokio::task::spawn_blocking;
+		#[cfg(feature = "async-std")]
+		let spawn = async_std::task::spawn_blocking;
+		#[cfg(feature = "blocking")]
+		let spawn = blocking::unblock;
+
+		// SAFETY: we're manually dropping the lock
+		let file = unsafe { std::ptr::read(&self.file) };
+
+		let res = spawn(move || unlock(file))
+			.await;
+
+		#[cfg(feature = "tokio")]
+		let res = res.unwrap();
+
 		std::mem::forget(self);
-		file
+
+		res
 	}
 
 	pub(crate) fn unlock_ref(&self) -> std::io::Result<()> {
-		unlock(&self.file)
+		unlock_ref(&self.file).map(|_| ())
 	}
 }
 
