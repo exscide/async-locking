@@ -2,6 +2,7 @@ use windows_sys::Win32::Storage::FileSystem::{ LockFileEx, UnlockFile, LOCKFILE_
 use std::os::windows::io::AsRawHandle;
 
 
+/// Catchall trait for files on windows
 pub trait AsDescriptor: AsRawHandle + Send + 'static {}
 impl<T: AsRawHandle + Send + 'static> AsDescriptor for T {}
 

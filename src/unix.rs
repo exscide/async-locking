@@ -2,6 +2,7 @@ use rustix::fs::{ flock, FlockOperation };
 use std::os::unix::io::AsFd;
 
 
+/// Catchall trait for files on unix
 pub trait AsDescriptor: AsFd + Send + 'static {}
 impl<T: AsFd + Send + 'static> AsDescriptor for T {}
 

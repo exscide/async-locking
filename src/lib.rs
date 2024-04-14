@@ -1,4 +1,4 @@
-// TODO: tests
+// TODO: errors
 // TODO: document platform specific behavior
 
 //! An async implementation of file locking using flock on unix and LockFileEx on windows.
@@ -163,16 +163,59 @@ mod tests {
 	#[cfg(feature = "tokio")]
 	#[tokio::test]
 	async fn test() {
+		use std::{process::Stdio, time::Duration};
+
+		let mut blocker = tokio::process::Command::new("cargo")
+			.args([
+				"run",
+				"--example",
+				"block"
+			])
+			.spawn()
+			.unwrap();
+
+		std::thread::sleep(Duration::from_secs(1));
+
 		let file = tokio::fs::File::options()
 			.create(true)
 			.read(true)
 			.write(true)
-			.open("target/ok")
+			.open("target/test.lock")
 			.await
 			.unwrap();
 
-		let fut = file.lock_shared();
+		file.try_lock_exclusive().expect_err("File should be exclusively locked");
+		file.try_lock_shared().expect_err("File should be exclusively locked");
 
-		fut.await.unwrap();
+		blocker.kill().await.unwrap();
+
+		let lock = tokio::time::timeout(Duration::from_secs(2), file.lock_exclusive())
+			.await
+			.unwrap()
+			.unwrap();
+
+		let mut blocker = tokio::process::Command::new("cargo")
+			.args([
+				"run",
+				"--example",
+				"block"
+			])
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.spawn()
+			.unwrap();
+
+		let code = tokio::time::timeout(Duration::from_secs(2), blocker.wait())
+			.await
+			.unwrap()
+			.unwrap()
+			.code()
+			.unwrap_or(1);
+
+		if code == 0 {
+			panic!("expected panic");
+		}
+
+		lock.unlock().await.unwrap();
 	}
 }
