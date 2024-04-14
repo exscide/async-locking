@@ -280,13 +280,13 @@ mod tests {
 
 	#[cfg(feature = "tokio")]
 	type File = tokio::fs::File;
-	#[cfg(feature = "async-std")]
+	#[cfg(any(feature = "async-std", feature = "blocking"))]
 	type File = async_std::fs::File;
 
 	async fn open_file(path: &str) -> File {
 		#[cfg(feature = "tokio")]
 		let mut file = tokio::fs::File::options();
-		#[cfg(feature = "async-std")]
+		#[cfg(any(feature = "async-std", feature = "blocking"))]
 		let mut file = async_std::fs::OpenOptions::new();
 
 		file.create(true)
@@ -299,6 +299,7 @@ mod tests {
 
 	#[cfg_attr(feature = "tokio", tokio::test)]
 	#[cfg_attr(feature = "async-std", async_std::test)]
+	#[cfg_attr(feature = "blocking", async_std::test)]
 	async fn test_lock_interprocess() {
 		use std::time::Duration;
 
@@ -324,7 +325,7 @@ mod tests {
 
 		#[cfg(feature = "tokio")]
 		let timeout = tokio::time::timeout;
-		#[cfg(feature = "async-std")]
+		#[cfg(any(feature = "async-std", feature = "blocking"))]
 		let timeout = async_std::future::timeout;
 
 		let lock = timeout(Duration::from_secs(2), file.lock_exclusive())
@@ -349,6 +350,7 @@ mod tests {
 
 	#[cfg_attr(feature = "tokio", tokio::test)]
 	#[cfg_attr(feature = "async-std", async_std::test)]
+	#[cfg_attr(feature = "blocking", async_std::test)]
 	async fn test_lock_current_process() {
 		let mut file = open_file("target/test2.lock").await;
 		let mut file2 = open_file("target/test2.lock").await;
