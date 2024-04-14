@@ -17,11 +17,11 @@ pub(crate) fn lock_exclusive<F: AsFd>(file: F) -> std::io::Result<F> {
 	Ok(file)
 }
 
-pub(crate) fn try_lock_shared<F: AsFd>(file: F) -> std::io::Result<()> {
+pub(crate) fn try_lock_shared<F: AsFd>(file: &F) -> std::io::Result<Option<()>> {
 	lock_file(file, FlockOperation::NonBlockingLockShared)
 }
 
-pub(crate) fn try_lock_exclusive<F: AsFd>(file: F) -> std::io::Result<()> {
+pub(crate) fn try_lock_exclusive<F: AsFd>(file: &F) -> std::io::Result<Option<()>> {
 	lock_file(file, FlockOperation::NonBlockingLockExclusive)
 }
 

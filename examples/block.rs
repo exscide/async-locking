@@ -2,7 +2,7 @@ use async_locking::AsyncLockFileExt;
 
 #[tokio::main]
 async fn main() {
-	let file = tokio::fs::File::options()
+	let mut file = tokio::fs::File::options()
 		.create(true)
 		.read(true)
 		.write(true)
@@ -10,7 +10,9 @@ async fn main() {
 		.await
 		.unwrap();
 
-	let _lock = file.try_lock_exclusive().unwrap();
+	let _lock = file.try_lock_exclusive()
+		.unwrap()
+		.unwrap();
 
 	loop { }
 }
