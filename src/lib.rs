@@ -1,4 +1,3 @@
-// TODO: errors
 // TODO: document platform specific behavior
 
 //! An async implementation of file locking using flock on unix and LockFileEx on windows.
@@ -224,6 +223,16 @@ mod tests {
 		.unwrap()
 	}
 
+	async fn lock_file(path: &str) -> tokio::fs::File {
+		tokio::fs::File::options()
+			.create(true)
+			.read(true)
+			.write(true)
+			.open(path)
+			.await
+			.unwrap()
+	}
+
 	#[cfg(feature = "tokio")]
 	#[tokio::test]
 	async fn test_lock() {
@@ -236,13 +245,7 @@ mod tests {
 
 		std::thread::sleep(Duration::from_millis(500));
 
-		let mut file = tokio::fs::File::options()
-			.create(true)
-			.read(true)
-			.write(true)
-			.open("target/test.lock")
-			.await
-			.unwrap();
+		let mut file = lock_file("target/test.lock").await;
 
 		file.try_lock_exclusive().unwrap().ok_or(()).expect_err("File should be exclusively locked");
 		file.try_lock_shared().unwrap().ok_or(()).expect_err("File should be exclusively locked");
@@ -280,5 +283,15 @@ mod tests {
 		}
 
 		lock.unlock().await.unwrap();
+	}
+
+	#[cfg(feature = "tokio")]
+	#[tokio::test]
+	async fn test_current_thread() {
+		let mut file = lock_file("target/test2.lock").await;
+		let mut file2 = lock_file("target/test2.lock").await;
+
+		let _lock = file.try_lock_exclusive().unwrap().unwrap();
+		assert!(file2.try_lock_exclusive().unwrap().is_none());
 	}
 }

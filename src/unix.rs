@@ -1,5 +1,5 @@
 use rustix::fs::{ flock, FlockOperation };
-use std::{io::ErrorKind, os::unix::io::AsFd};
+use std::{ io::ErrorKind, os::unix::io::AsFd };
 
 
 /// Catchall trait for files on unix
