@@ -287,11 +287,24 @@ mod tests {
 
 	#[cfg(feature = "tokio")]
 	#[tokio::test]
-	async fn test_current_thread() {
+	async fn test_current_process() {
 		let mut file = lock_file("target/test2.lock").await;
 		let mut file2 = lock_file("target/test2.lock").await;
 
-		let _lock = file.try_lock_exclusive().unwrap().unwrap();
+		let lock = file.try_lock_exclusive()
+			.unwrap()
+			.unwrap();
 		assert!(file2.try_lock_exclusive().unwrap().is_none());
+
+		lock.unlock().unwrap();
+
+		let lock = file2.try_lock_exclusive()
+			.unwrap()
+			.unwrap();
+
+		assert!(file.try_lock_exclusive().unwrap().is_none());
+
+		lock.unlock().unwrap();
+
 	}
 }
