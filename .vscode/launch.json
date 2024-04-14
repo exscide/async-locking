@@ -1,0 +1,103 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'async_locking'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=async-locking",
+					"--no-default-features",
+					"-F", "async-std"
+				],
+				"filter": {
+					"name": "async_locking",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug example 'async_block'",
+			"cargo": {
+				"args": [
+					"build",
+					"--example=async_block",
+					"--package=async-locking"
+				],
+				"filter": {
+					"name": "async_block",
+					"kind": "example"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in example 'async_block'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--example=async_block",
+					"--package=async-locking"
+				],
+				"filter": {
+					"name": "async_block",
+					"kind": "example"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug example 'block'",
+			"cargo": {
+				"args": [
+					"build",
+					"--example=block",
+					"--package=async-locking"
+				],
+				"filter": {
+					"name": "block",
+					"kind": "example"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in example 'block'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--example=block",
+					"--package=async-locking"
+				],
+				"filter": {
+					"name": "block",
+					"kind": "example"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

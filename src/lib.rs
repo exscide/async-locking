@@ -1,4 +1,4 @@
-//! An async implementation of file locking using [flock](https://man7.org/linux/man-pages/man2/flock.2.html) on unix and [LockFileEx](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex) on windows.
+//! Async file locking using [flock](https://man7.org/linux/man-pages/man2/flock.2.html) on unix and [LockFileEx](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex) on windows.
 //! 
 //! ```
 //! use async_locking::AsyncLockFileExt;
@@ -227,24 +227,69 @@ impl<'a, T: AsDescriptor> std::ops::DerefMut for LockRef<'a, T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::process::Stdio;
+	use std::{ io::{ BufRead, BufReader }, process::{ Child, ChildStdout, ExitStatus, Stdio } };
 
-	fn blocker() -> tokio::process::Child {
-		tokio::process::Command::new("cargo")
-		.args([
-			"run",
-			"--example",
-			"block"
-		])
-		.stdout(Stdio::null())
-		.stderr(Stdio::null())
-		.spawn()
-		.unwrap()
+	struct Process {
+		inner: Child,
+		stdout: BufReader<ChildStdout>,
 	}
 
-	async fn lock_file(path: &str) -> tokio::fs::File {
-		tokio::fs::File::options()
-			.create(true)
+	impl Process {
+		pub fn new(command: &str, args: &[&str]) -> std::io::Result<Self> {
+			let mut child = std::process::Command::new(command)
+				.args(args)
+				.stdout(Stdio::piped())
+				.stderr(Stdio::piped())
+				.spawn()?;
+
+			Ok(Self {
+				stdout: BufReader::new(child.stdout.take().unwrap()),
+				inner: child,
+			})
+		}
+
+		pub fn wait_for(&mut self, cmd: &str) -> std::io::Result<()> {
+			loop {
+				let mut buf = String::new();
+				self.stdout.read_line(&mut buf)?;
+				if buf.contains(cmd) {
+					break;
+				}
+			}
+
+			Ok(())
+		}
+
+		pub fn kill(&mut self) -> std::io::Result<()> {
+			self.inner.kill()
+		}
+
+		pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+			self.inner.try_wait()
+		}
+	}
+
+	fn blocker() -> Process {
+		Process::new("cargo", &[
+				"run",
+				"--example",
+				"block"
+			])
+			.unwrap()
+	}
+
+	#[cfg(feature = "tokio")]
+	type File = tokio::fs::File;
+	#[cfg(feature = "async-std")]
+	type File = async_std::fs::File;
+
+	async fn open_file(path: &str) -> File {
+		#[cfg(feature = "tokio")]
+		let mut file = tokio::fs::File::options();
+		#[cfg(feature = "async-std")]
+		let mut file = async_std::fs::OpenOptions::new();
+
+		file.create(true)
 			.read(true)
 			.write(true)
 			.open(path)
@@ -252,35 +297,37 @@ mod tests {
 			.unwrap()
 	}
 
-	#[cfg(feature = "tokio")]
-	#[tokio::test]
-	async fn test_lock() {
+	#[cfg_attr(feature = "tokio", tokio::test)]
+	#[cfg_attr(feature = "async-std", async_std::test)]
+	async fn test_lock_interprocess() {
 		use std::time::Duration;
 
 
 		// -- other thread is blocking --
 
 		let mut blck = blocker();
+		blck.wait_for("ready").unwrap();
 
-		std::thread::sleep(Duration::from_millis(500));
-
-		let mut file = lock_file("target/test.lock").await;
+		let mut file = open_file("target/test.lock").await;
 
 		file.try_lock_exclusive().unwrap().ok_or(()).expect_err("File should be exclusively locked");
 		file.try_lock_shared().unwrap().ok_or(()).expect_err("File should be exclusively locked");
 
-		blck.kill().await.unwrap();
+		blck.kill().unwrap();
 
-		std::thread::sleep(Duration::from_millis(100));
+		// -- other thread stopped blocking --
+
+		std::thread::sleep(Duration::from_millis(200));
 
 		let l = file.try_lock_exclusive().unwrap().unwrap();
 		drop(l);
 
-		std::thread::sleep(Duration::from_millis(100));
+		#[cfg(feature = "tokio")]
+		let timeout = tokio::time::timeout;
+		#[cfg(feature = "async-std")]
+		let timeout = async_std::future::timeout;
 
-		// -- other thread stopped blocking --
-
-		let lock = tokio::time::timeout(Duration::from_secs(2), file.lock_exclusive())
+		let lock = timeout(Duration::from_secs(2), file.lock_exclusive())
 			.await
 			.unwrap()
 			.unwrap();
@@ -290,25 +337,21 @@ mod tests {
 
 		let mut blck = blocker();
 
-		let code = tokio::time::timeout(Duration::from_secs(2), blck.wait())
-			.await
-			.unwrap()
-			.unwrap()
-			.code()
-			.unwrap_or(1);
+		let code = blck.try_wait().unwrap();
 
-		if code == 0 {
+		if code.is_some() {
 			panic!("expected panic");
 		}
 
 		lock.unlock().await.unwrap();
 	}
 
-	#[cfg(feature = "tokio")]
-	#[tokio::test]
-	async fn test_current_process() {
-		let mut file = lock_file("target/test2.lock").await;
-		let mut file2 = lock_file("target/test2.lock").await;
+
+	#[cfg_attr(feature = "tokio", tokio::test)]
+	#[cfg_attr(feature = "async-std", async_std::test)]
+	async fn test_lock_current_process() {
+		let mut file = open_file("target/test2.lock").await;
+		let mut file2 = open_file("target/test2.lock").await;
 
 		let lock = file.try_lock_exclusive()
 			.unwrap()
