@@ -24,7 +24,11 @@ pub(crate) fn try_lock_exclusive<F: AsFd>(file: F) -> std::io::Result<()> {
 	lock_file(file, FlockOperation::NonBlockingLockExclusive)
 }
 
-pub(crate) fn unlock<F: AsFd>(file: F) -> std::io::Result<()> {
+pub(crate) fn unlock<F: AsFd>(file: F) -> std::io::Result<F> {
+	unlock_ref(&file).map(|_| file)
+}
+
+pub(crate) fn unlock_ref<F: AsFd>(file: &F) -> std::io::Result<()> {
 	lock_file(file, FlockOperation::Unlock)
 }
 
