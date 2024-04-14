@@ -1,6 +1,25 @@
-// TODO: document platform specific behavior
-
-//! An async implementation of file locking using flock on unix and LockFileEx on windows.
+//! An async implementation of file locking using [flock](https://man7.org/linux/man-pages/man2/flock.2.html) on unix and [LockFileEx](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex) on windows.
+//! 
+//! ```
+//! use async_locking::AsyncLockFileExt;
+//! 
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! 	let file = std::fs::File::options()
+//! 		.create(true)
+//! 		.write(true)
+//! 		.open("target/yeet.lock")
+//! 		.expect("unable to open file");
+//! 
+//! 	let lock = file.lock_exclusive().await?;
+//! 
+//! 	// ... lock.write(...)
+//! 
+//! 	lock.unlock().await?;
+//! 
+//! 	Ok(())
+//! }
+//! ```
 //! 
 //! ## Feature flags
 //! By default, the `tokio` feature is active.
