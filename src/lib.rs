@@ -1,3 +1,14 @@
+//! Async implementation of file locking using flock on unix and LockFileEx on windows.
+//! 
+//! ## Feature flags
+//! By default, the `tokio` feature is active.
+//! Make sure to disable it, when using another runtime.
+//! 
+//! 
+//! - `tokio`: Use the tokio runtime ([tokio::task::spawn_blocking](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html))
+//! - `async-std`: Use the async-std runtime ([async_std::task::spawn_blocking](https://docs.rs/async-std/latest/async_std/task/fn.spawn_blocking.html))
+//! - `blocking`: Use the blocking thread pool ([blocking::unblock](https://docs.rs/blocking/latest/blocking/fn.unblock.html))
+
 #[cfg(any(
 	all(feature = "tokio", feature = "async-std"),
 	all(feature = "tokio", feature = "blocking"),
@@ -18,16 +29,21 @@ mod unix;
 use unix::*;
 
 
-pub trait AsyncFileExt: AsDescriptor {
+/// An extension trait for any [std::fs::File] like type that provides async file locking methods.
+pub trait AsyncLockFileExt: AsDescriptor {
+	/// Asynchronously wait to obtain a shared lock
 	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized;
+	/// Asynchronously wait to obtain an exclusive lock
 	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized;
+	/// Try to obtain a shared lock
 	fn try_lock_shared(&self) -> std::io::Result<()>;
+	/// Try to obtain an exclusive lock
 	fn try_lock_exclusive(&self) -> std::io::Result<()>;
 }
 
 
 
-impl<T: AsDescriptor + Send + 'static> AsyncFileExt for T {
+impl<T: AsDescriptor + Send + 'static> AsyncLockFileExt for T {
 	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send {
 		async move {
 			#[cfg(feature = "tokio")]
