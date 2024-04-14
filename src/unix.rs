@@ -1,5 +1,5 @@
 use rustix::fs::{ flock, FlockOperation };
-use std::os::unix::io::AsFd;
+use std::{io::ErrorKind, os::unix::io::AsFd};
 
 
 /// Catchall trait for files on unix
@@ -18,11 +18,27 @@ pub(crate) fn lock_exclusive<F: AsFd>(file: F) -> std::io::Result<F> {
 }
 
 pub(crate) fn try_lock_shared<F: AsFd>(file: &F) -> std::io::Result<Option<()>> {
-	lock_file(file, FlockOperation::NonBlockingLockShared)
+	let res = lock_file(file, FlockOperation::NonBlockingLockShared);
+
+	if let Err(e) = &res {
+		if let ErrorKind::WouldBlock = e.kind() {
+			return Ok(None);
+		}
+	}
+
+	res.map(|_| Some(()))
 }
 
 pub(crate) fn try_lock_exclusive<F: AsFd>(file: &F) -> std::io::Result<Option<()>> {
-	lock_file(file, FlockOperation::NonBlockingLockExclusive)
+	let res = lock_file(file, FlockOperation::NonBlockingLockExclusive);
+
+	if let Err(e) = &res {
+		if let ErrorKind::WouldBlock = e.kind() {
+			return Ok(None);
+		}
+	}
+
+	res.map(|_| Some(()))
 }
 
 pub(crate) fn unlock<F: AsFd>(file: F) -> std::io::Result<F> {

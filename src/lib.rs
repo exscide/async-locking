@@ -234,7 +234,7 @@ mod tests {
 
 		let mut blck = blocker();
 
-		std::thread::sleep(Duration::from_secs(1));
+		std::thread::sleep(Duration::from_millis(500));
 
 		let mut file = tokio::fs::File::options()
 			.create(true)
@@ -248,6 +248,13 @@ mod tests {
 		file.try_lock_shared().unwrap().ok_or(()).expect_err("File should be exclusively locked");
 
 		blck.kill().await.unwrap();
+
+		std::thread::sleep(Duration::from_millis(100));
+
+		let l = file.try_lock_exclusive().unwrap().unwrap();
+		drop(l);
+
+		std::thread::sleep(Duration::from_millis(100));
 
 		// -- other thread stopped blocking --
 
