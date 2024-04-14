@@ -6,9 +6,13 @@ edition = "2021"
 [features]
 default = [ "tokio" ]
 tokio = [ "dep:tokio" ]
+async-std = [ "dep:async-std" ]
+blocking = [ "dep:blocking" ]
 
 [dependencies]
 tokio = { version = "1", optional = true, default-features = false, features = [ "fs", "rt" ] }
+async-std = { version = "1", optional = true, default-features = false, features = ["alloc", "default"] }
+blocking = { version = "1", optional = true, default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = [ "Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO"] }
@@ -18,3 +22,4 @@ rustix = { version = "0.38.32", features = [ "fs" ] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+async-std = { version = "1", default-features = true }
