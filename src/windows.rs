@@ -2,7 +2,7 @@ use windows_sys::Win32::{ Foundation::ERROR_LOCK_VIOLATION, Storage::FileSystem:
 use std::os::windows::io::AsRawHandle;
 
 
-/// Catchall trait for files on windows
+/// Catchall trait for [File](std::fs::File) like types
 pub trait AsDescriptor: AsRawHandle + Send + 'static {}
 impl<T: AsRawHandle + Send + 'static> AsDescriptor for T {}
 

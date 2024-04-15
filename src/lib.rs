@@ -42,15 +42,15 @@ use std::future::Future;
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-use windows::*;
+pub use windows::*;
 
 #[cfg(not(windows))]
 mod unix;
 #[cfg(not(windows))]
-use unix::*;
+pub use unix::*;
 
 
-/// An extension trait for any [File](std::fs::File) like type that provides async file locking methods.
+/// Extension trait for [File](std::fs::File) like types that provides async file locking methods.
 pub trait AsyncLockFileExt: AsDescriptor {
 	/// Asynchronously wait to obtain a shared lock
 	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
@@ -113,7 +113,7 @@ impl<T: AsDescriptor> AsyncLockFileExt for T {
 }
 
 
-/// A guard that holds a locked file.
+/// Guard that holds a locked file.
 /// 
 /// It automatically unlocks the file on drop, but it can be manually unlocked using [Lock::unlock].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -177,7 +177,7 @@ impl<T: AsDescriptor> std::ops::DerefMut for Lock<T> {
 
 
 
-/// A guard that holds a referebce to a locked file.
+/// Guard that holds a reference to a locked file.
 /// 
 /// It automatically unlocks the file on drop, but it can be manually unlocked using [Lock::unlock].
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,6 +1,7 @@
 # async-locking
 Async file locking using flock on unix and LockFileEx on windows.
 
+
 ```rust
 use async_locking::AsyncLockFileExt;
 
@@ -13,7 +14,6 @@ let lock = file.lock_exclusive().await?;
 
 lock.unlock().await?;
 ```
-
 
 ## Feature flags
 By default, the `tokio` feature is active.

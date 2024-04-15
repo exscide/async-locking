@@ -2,7 +2,7 @@ use rustix::fs::{ flock, FlockOperation };
 use std::{ io::ErrorKind, os::unix::io::AsFd };
 
 
-/// Catchall trait for files on unix
+/// Catchall trait for [File](std::fs::File) like types
 pub trait AsDescriptor: AsFd + Send + 'static {}
 impl<T: AsFd + Send + 'static> AsDescriptor for T {}
 
