@@ -17,7 +17,7 @@ lock.unlock().await?;
 
 ## Feature flags
 By default, the `tokio` feature is active.
-Make sure to disable it, when using another runtime.
+Make sure to disable default features, when using another runtime.
 
 - `tokio`: Use the tokio runtime ([tokio::task::spawn_blocking](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html))
 - `async-std`: Use the async-std runtime ([async_std::task::spawn_blocking](https://docs.rs/async-std/latest/async_std/task/fn.spawn_blocking.html))
