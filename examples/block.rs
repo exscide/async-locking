@@ -13,11 +13,10 @@ async fn main() {
 		.unwrap();
 
 	#[cfg(any(feature = "async-std", feature = "blocking"))]
-	let mut file = async_std::fs::OpenOptions::new()
+	let mut file = std::fs::File::options()
 		.create(true)
 		.write(true)
 		.open("target/test.lock")
-		.await
 		.unwrap();
 
 	println!("ready");

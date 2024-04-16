@@ -56,21 +56,11 @@ fn blocker() -> Process {
 		.unwrap()
 }
 
-#[cfg(feature = "tokio")]
-type File = tokio::fs::File;
-#[cfg(any(feature = "async-std", feature = "blocking"))]
-type File = async_std::fs::File;
-
-async fn open_file(path: &str) -> File {
-	#[cfg(feature = "tokio")]
-	let mut file = tokio::fs::File::options();
-	#[cfg(any(feature = "async-std", feature = "blocking"))]
-	let mut file = async_std::fs::OpenOptions::new();
-
-	file.create(true)
+async fn open_file(path: &str) -> std::fs::File {
+	std::fs::File::options()
+		.create(true)
 		.write(true)
 		.open(path)
-		.await
 		.unwrap()
 }
 
