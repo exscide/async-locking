@@ -150,27 +150,8 @@ async fn test_lock_current_process() {
 }
 
 
-#[cfg(windows)]
-use std::os::windows::io::{ AsRawHandle, RawHandle };
-#[cfg(not(windows))]
-use std::os::unix::io::AsRawFd;
-
-#[cfg(windows)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Handle(pub isize);
-
-#[cfg(windows)]
-impl AsRawHandle for Handle {
-	fn as_raw_handle(&self) -> std::os::windows::prelude::RawHandle {
-		self.0 as RawHandle
-	}
-}
-
-
 #[cfg(feature = "tokio")]
 async fn os_test() {
-
-
 	// lock the file
 	let mut blck = blocker();
 	blck.wait_for("ready").unwrap();
@@ -183,10 +164,7 @@ async fn os_test() {
 
 	assert!(f.try_lock_exclusive().unwrap().is_none());
 
-	#[cfg(not(windows))]
-	let fd = f.as_raw_fd();
-	#[cfg(windows)]
-	let fd = Handle(f.as_raw_handle() as isize);
+	let fd = f.as_descriptor();
 
 	// it seems like the drop call blocks until the lock call is done,
 	// ensure this behavior across platforms
