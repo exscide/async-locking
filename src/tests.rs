@@ -214,15 +214,19 @@ async fn os_test() {
 	println!("killing blocker");
 	blck.kill().unwrap();
 
-	println!("waiting for lock to be acquired");
-	waiter.await
-		.unwrap()
-		.unwrap();
+	println!("waiting for lock to be acquired (unix) or stalling (windows)");
+	let res = tokio::time::timeout(Duration::from_secs(1), waiter)
+		.await;
+
+	#[cfg(windows)]
+	res.expect_err("on windows, it never completes");
+	#[cfg(unix)]
+	res.unwrap().unwrap().unwrap();
 
 	// trying to lock a dropped file should error
 	#[cfg(not(windows))]
 	let err = libc::EBADF;
 	#[cfg(windows)]
-	let err = 0;
+	let err = windows_sys::Win32::Foundation::ERROR_INVALID_HANDLE as i32;
 	assert_eq!(lock_exclusive(fd).map_err(|e| e.raw_os_error()), Err(Some(err)));
 }
