@@ -5,7 +5,7 @@
 //! 
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! 	let file = std::fs::File::options()
+//! 	let mut file = std::fs::File::options()
 //! 		.create(true)
 //! 		.write(true)
 //! 		.open("target/yeet.lock")
@@ -15,7 +15,7 @@
 //! 
 //! 	// ... lock.write(...)
 //! 
-//! 	lock.unlock().await?;
+//! 	lock.unlock()?;
 //! 
 //! 	Ok(())
 //! }
@@ -53,26 +53,26 @@ pub use unix::*;
 /// Extension trait for [File](std::fs::File) like types that provides async file locking methods.
 pub trait AsyncLockFileExt: AsDescriptor {
 	/// Asynchronously wait to obtain a shared lock
-	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
+	fn lock_shared(&mut self) -> impl Future<Output = std::io::Result<LockRef<Self>>> + Send where Self: Sized + 'static;
 
 	/// Asynchronously wait to obtain an exclusive lock
-	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
+	fn lock_exclusive(&mut self) -> impl Future<Output = std::io::Result<LockRef<Self>>> + Send where Self: Sized + 'static;
 
 	/// Try to obtain a shared lock
 	fn try_lock_shared<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
-		try_lock_shared(self).map(|f| f.map(|_| LockRef::new(self)))
+		try_lock_shared(self.as_descriptor()).map(|f| f.map(|_| LockRef::new(self)))
 	}
 
 	/// Try to obtain an exclusive lock
 	fn try_lock_exclusive<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
-		try_lock_exclusive(self).map(|f| f.map(|_| LockRef::new(self)))
+		try_lock_exclusive(self.as_descriptor()).map(|f| f.map(|_| LockRef::new(self)))
 	}
 }
 
 
 
 impl<T: AsDescriptor> AsyncLockFileExt for T {
-	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send {
+	fn lock_shared(&mut self) -> impl Future<Output = std::io::Result<LockRef<Self>>> + Send {
 		async move {
 			#[cfg(feature = "tokio")]
 			let spawn = tokio::task::spawn_blocking;
@@ -81,17 +81,19 @@ impl<T: AsDescriptor> AsyncLockFileExt for T {
 			#[cfg(feature = "blocking")]
 			let spawn = blocking::unblock;
 
-			let res = spawn(move || lock_shared(self))
+			let desc = self.as_descriptor();
+
+			let res = spawn(move || lock_shared(desc))
 				.await;
 
 			#[cfg(feature = "tokio")]
 			let res = res.unwrap();
 
-			res.map(|file| Lock::new(file))
+			res.map(|_| LockRef::new(self))
 		}
 	}
 
-	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send {
+	fn lock_exclusive(&mut self) -> impl Future<Output = std::io::Result<LockRef<Self>>> + Send {
 		async move {
 			#[cfg(feature = "tokio")]
 			let spawn = tokio::task::spawn_blocking;
@@ -100,81 +102,18 @@ impl<T: AsDescriptor> AsyncLockFileExt for T {
 			#[cfg(feature = "blocking")]
 			let spawn = blocking::unblock;
 
-			let res = spawn(move || lock_exclusive(self))
+			let desc = self.as_descriptor();
+
+			let res = spawn(move || lock_exclusive(desc))
 				.await;
 
 			#[cfg(feature = "tokio")]
 			let res = res.unwrap();
 
-			res.map(|file| Lock::new(file))
+			res.map(|_| LockRef::new(self))
 		}
 	}
 }
-
-
-/// Guard that holds a locked file.
-/// 
-/// It automatically unlocks the file on drop, but it can be manually unlocked using [Lock::unlock].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Lock<T: AsDescriptor> {
-	file: T,
-}
-
-impl<T: AsDescriptor> Lock<T> {
-	pub(crate) fn new(file: T) -> Self {
-		Self { file }
-	}
-
-	// TODO: async unlock useful?
-	/// Asynchronously unlock the file
-	pub async fn unlock(self) -> std::io::Result<T> {
-		#[cfg(feature = "tokio")]
-		let spawn = tokio::task::spawn_blocking;
-		#[cfg(feature = "async-std")]
-		let spawn = async_std::task::spawn_blocking;
-		#[cfg(feature = "blocking")]
-		let spawn = blocking::unblock;
-
-		// SAFETY: we're manually dropping the lock
-		let file = unsafe { std::ptr::read(&self.file) };
-
-		let res = spawn(move || unlock(file))
-			.await;
-
-		#[cfg(feature = "tokio")]
-		let res = res.unwrap();
-
-		std::mem::forget(self);
-
-		res
-	}
-
-	pub unsafe fn unlock_ref(&self) -> std::io::Result<()> {
-		unlock_ref(&self.file).map(|_| ())
-	}
-}
-
-impl<T: AsDescriptor> Drop for Lock<T> {
-	fn drop(&mut self) {
-		// SAFETY: can only be called once, since the safe unlock method takes ownership
-		let _ = unsafe { self.unlock_ref() };
-	}
-}
-
-impl<T: AsDescriptor> std::ops::Deref for Lock<T> {
-	type Target = T;
-
-	fn deref(&self) -> &Self::Target {
-		&self.file
-	}
-}
-
-impl<T: AsDescriptor> std::ops::DerefMut for Lock<T> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.file
-	}
-}
-
 
 
 /// Guard that holds a reference to a locked file.
@@ -192,13 +131,13 @@ impl<'a, T: AsDescriptor> LockRef<'a, T> {
 
 	/// Unlock the file
 	pub fn unlock(self) -> std::io::Result<()> {
-		unlock_ref(self.file)?;
+		unlock(self.file.as_descriptor())?;
 		std::mem::forget(self);
 		Ok(())
 	}
 
 	pub unsafe fn unlock_ref(&self) -> std::io::Result<()> {
-		unlock_ref(self.file)
+		unlock(self.file.as_descriptor())
 	}
 }
 

@@ -1,24 +1,31 @@
-use std::{ io::{ Error, ErrorKind }, os::fd::AsRawFd };
+use std::{ io::{ Error, ErrorKind }, os::fd::{ AsRawFd, RawFd } };
 
 use libc::{c_int, LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN};
 
 
+pub type Descriptor = RawFd;
+
 /// Catchall trait for [File](std::fs::File) like types
-pub trait AsDescriptor: AsRawFd + Send + 'static {}
-impl<T: AsRawFd + Send + 'static> AsDescriptor for T {}
-
-
-pub(crate) fn lock_shared<F: AsRawFd>(file: F) -> std::io::Result<F> {
-	lock_file(&file, LOCK_SH)?;
-	Ok(file)
+pub trait AsDescriptor: Send + 'static {
+	fn as_descriptor(&self) -> Descriptor;
 }
 
-pub(crate) fn lock_exclusive<F: AsRawFd>(file: F) -> std::io::Result<F> {
-	lock_file(&file, LOCK_EX)?;
-	Ok(file)
+impl<T: AsRawFd + Send + 'static> AsDescriptor for T {
+	fn as_descriptor(&self) -> Descriptor {
+		self.as_raw_fd()
+	}
 }
 
-pub(crate) fn try_lock_shared<F: AsRawFd>(file: &F) -> std::io::Result<Option<()>> {
+
+pub(crate) fn lock_shared(file: Descriptor) -> std::io::Result<()> {
+	lock_file(file, LOCK_SH)
+}
+
+pub(crate) fn lock_exclusive(file: Descriptor) -> std::io::Result<()> {
+	lock_file(file, LOCK_EX)
+}
+
+pub(crate) fn try_lock_shared(file: Descriptor) -> std::io::Result<Option<()>> {
 	let res = lock_file(file, LOCK_SH | LOCK_NB);
 
 	if let Err(e) = &res {
@@ -30,7 +37,7 @@ pub(crate) fn try_lock_shared<F: AsRawFd>(file: &F) -> std::io::Result<Option<()
 	res.map(|_| Some(()))
 }
 
-pub(crate) fn try_lock_exclusive<F: AsRawFd>(file: &F) -> std::io::Result<Option<()>> {
+pub(crate) fn try_lock_exclusive(file: Descriptor) -> std::io::Result<Option<()>> {
 	let res = lock_file(file, LOCK_EX | LOCK_NB);
 
 	if let Err(e) = &res {
@@ -42,17 +49,13 @@ pub(crate) fn try_lock_exclusive<F: AsRawFd>(file: &F) -> std::io::Result<Option
 	res.map(|_| Some(()))
 }
 
-pub(crate) fn unlock<F: AsRawFd>(file: F) -> std::io::Result<F> {
-	unlock_ref(&file).map(|_| file)
-}
-
-pub(crate) fn unlock_ref<F: AsRawFd>(file: &F) -> std::io::Result<()> {
+pub(crate) fn unlock(file: Descriptor) -> std::io::Result<()> {
 	lock_file(file, LOCK_UN)
 }
 
-fn lock_file<F: AsRawFd>(file: &F, op: c_int) -> std::io::Result<()> {
+fn lock_file(file: Descriptor, op: c_int) -> std::io::Result<()> {
 	let res = unsafe {
-		libc::flock(file.as_raw_fd(), op)
+		libc::flock(file, op)
 	};
 
 	match res {

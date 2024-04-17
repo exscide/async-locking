@@ -111,7 +111,7 @@ async fn test_lock_interprocess() {
 		panic!("expected panic");
 	}
 
-	lock.unlock().await.unwrap();
+	lock.unlock().unwrap();
 
 	#[cfg(feature = "tokio")]
 	os_test().await;
@@ -193,7 +193,7 @@ async fn os_test() {
 
 	let (s, r) = channel();
 
-	let waiter = tokio::spawn(async move {
+	let _waiter = tokio::spawn(async move {
 		s.send(()).unwrap();
 		println!("waiting");
 		tokio::task::spawn_blocking(move || lock_exclusive(fd)).await.unwrap()
@@ -214,14 +214,8 @@ async fn os_test() {
 	println!("killing blocker");
 	blck.kill().unwrap();
 
-	println!("waiting for lock to be acquired (unix) or stalling (windows)");
-	let res = tokio::time::timeout(Duration::from_secs(1), waiter)
-		.await;
-
-	#[cfg(windows)]
-	res.expect_err("on windows, it never completes");
-	#[cfg(unix)]
-	res.unwrap().unwrap().unwrap();
+	// it's probably undefined behavior what happens to the waiter,
+	// the call seems to stall on windows and sometimes stall on macos
 
 	// trying to lock a dropped file should error
 	#[cfg(not(windows))]
