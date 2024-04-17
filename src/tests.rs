@@ -1,7 +1,5 @@
-use libc::EBADF;
-
 use super::*;
-use std::{ io::{ BufRead, BufReader, Error }, process::{ Child, ChildStdout, ExitStatus, Stdio }, sync::mpsc::channel, time::Duration };
+use std::{ io::{ BufRead, BufReader }, process::{ Child, ChildStdout, ExitStatus, Stdio }, sync::mpsc::channel, time::Duration };
 
 struct Process {
 	inner: Child,
@@ -152,9 +150,26 @@ async fn test_lock_current_process() {
 }
 
 
+#[cfg(windows)]
+use std::os::windows::io::{ AsRawHandle, RawHandle };
+#[cfg(not(windows))]
+use std::os::unix::io::AsRawFd;
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Handle(pub isize);
+
+#[cfg(windows)]
+impl AsRawHandle for Handle {
+	fn as_raw_handle(&self) -> std::os::windows::prelude::RawHandle {
+		self.0 as RawHandle
+	}
+}
+
+
 #[cfg(feature = "tokio")]
 async fn os_test() {
-	use std::os::unix::io::AsRawFd;
+
 
 	// lock the file
 	let mut blck = blocker();
@@ -168,7 +183,10 @@ async fn os_test() {
 
 	assert!(f.try_lock_exclusive().unwrap().is_none());
 
+	#[cfg(not(windows))]
 	let fd = f.as_raw_fd();
+	#[cfg(windows)]
+	let fd = Handle(f.as_raw_handle() as isize);
 
 	// it seems like the drop call blocks until the lock call is done,
 	// ensure this behavior across platforms
@@ -193,14 +211,17 @@ async fn os_test() {
 		.await
 		.expect_err("drop should wait for lock");
 
+	println!("killing blocker");
 	blck.kill().unwrap();
+
+	println!("waiting for lock to be acquired");
 	waiter.await
 		.unwrap()
 		.unwrap();
 
 	// trying to lock a dropped file should error
 	#[cfg(not(windows))]
-	let err = EBADF;
+	let err = libc::EBADF;
 	#[cfg(windows)]
 	let err = 0;
 	assert_eq!(lock_exclusive(fd).map_err(|e| e.raw_os_error()), Err(Some(err)));

@@ -54,12 +54,19 @@ pub use unix::*;
 pub trait AsyncLockFileExt: AsDescriptor {
 	/// Asynchronously wait to obtain a shared lock
 	fn lock_shared(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
+
 	/// Asynchronously wait to obtain an exclusive lock
 	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
+
 	/// Try to obtain a shared lock
-	fn try_lock_shared<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static;
+	fn try_lock_shared<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
+		try_lock_shared(self).map(|f| f.map(|_| LockRef::new(self)))
+	}
+
 	/// Try to obtain an exclusive lock
-	fn try_lock_exclusive<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static;
+	fn try_lock_exclusive<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
+		try_lock_exclusive(self).map(|f| f.map(|_| LockRef::new(self)))
+	}
 }
 
 
@@ -101,14 +108,6 @@ impl<T: AsDescriptor> AsyncLockFileExt for T {
 
 			res.map(|file| Lock::new(file))
 		}
-	}
-
-	fn try_lock_shared<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
-		try_lock_shared(self).map(|f| f.map(|_| LockRef::new(self)))
-	}
-
-	fn try_lock_exclusive<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
-		try_lock_exclusive(self).map(|f| f.map(|_| LockRef::new(self)))
 	}
 }
 
@@ -180,7 +179,7 @@ impl<T: AsDescriptor> std::ops::DerefMut for Lock<T> {
 
 /// Guard that holds a reference to a locked file.
 /// 
-/// It automatically unlocks the file on drop, but it can be manually unlocked using [Lock::unlock].
+/// It automatically unlocks the file on drop, but it can be manually unlocked using [LockRef::unlock].
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LockRef<'a, T: AsDescriptor> {
 	file: &'a mut T,

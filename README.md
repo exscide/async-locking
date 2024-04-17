@@ -1,6 +1,9 @@
 # async-locking
 Async file locking using flock on unix and LockFileEx on windows.
 
+**Status:** In development
+
+---
 
 ```rust
 use async_locking::AsyncLockFileExt;
