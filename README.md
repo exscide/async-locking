@@ -1,9 +1,6 @@
 # async-locking
 Async file locking using flock on unix and LockFileEx on windows.
 
-**Status:** In development
-
----
 
 ```rust
 use async_locking::AsyncLockFileExt;
@@ -17,6 +14,9 @@ let lock = file.lock_exclusive().await?;
 
 lock.unlock().await?;
 ```
+
+## Warning
+With the current implementation, cancelling a task that waits on a lock may block or result in undefined behavior. That is, because blocking threads cannot be terminated in a meaningful way. This could be solved by using non-blocking I/O in the future.
 
 ## Feature flags
 By default, the `tokio` feature is active.
