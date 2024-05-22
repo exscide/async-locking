@@ -78,8 +78,8 @@ async fn test_lock_interprocess() {
 
 	let mut file = open_file("target/test.lock").await;
 
-	file.try_lock_exclusive().unwrap().ok_or(()).expect_err("File should be exclusively locked");
-	file.try_lock_shared().unwrap().ok_or(()).expect_err("File should be exclusively locked");
+	file.try_lock_exclusive_ref().unwrap().ok_or(()).expect_err("File should be exclusively locked");
+	file.try_lock_shared_ref().unwrap().ok_or(()).expect_err("File should be exclusively locked");
 
 	blck.kill().unwrap();
 
@@ -87,7 +87,7 @@ async fn test_lock_interprocess() {
 
 	std::thread::sleep(Duration::from_millis(200));
 
-	let l = file.try_lock_exclusive().unwrap().unwrap();
+	let l = file.try_lock_exclusive_ref().unwrap().unwrap();
 	drop(l);
 
 	#[cfg(feature = "tokio")]
@@ -95,7 +95,7 @@ async fn test_lock_interprocess() {
 	#[cfg(any(feature = "async-std", feature = "blocking"))]
 	let timeout = async_std::future::timeout;
 
-	let lock = timeout(Duration::from_secs(2), file.lock_exclusive())
+	let lock = timeout(Duration::from_secs(2), file.lock_exclusive_ref())
 		.await
 		.unwrap()
 		.unwrap();
@@ -125,26 +125,26 @@ async fn test_lock_current_process() {
 	let mut file = open_file("target/test2.lock").await;
 	let mut file2 = open_file("target/test2.lock").await;
 
-	let lock = file.try_lock_exclusive()
+	let lock = file.try_lock_exclusive_ref()
 		.unwrap()
 		.unwrap();
-	assert!(file2.try_lock_exclusive().unwrap().is_none());
+	assert!(file2.try_lock_exclusive_ref().unwrap().is_none());
 
 	lock.unlock().unwrap();
 
-	let lock = file2.try_lock_exclusive()
+	let lock = file2.try_lock_exclusive_ref()
 		.unwrap()
 		.unwrap();
 
-	assert!(file.try_lock_exclusive().unwrap().is_none());
+	assert!(file.try_lock_exclusive_ref().unwrap().is_none());
 
 	lock.unlock().unwrap();
 
-	let lock = file.try_lock_shared()
+	let lock = file.try_lock_shared_ref()
 		.unwrap()
 		.unwrap();
-	assert!(file2.try_lock_shared().unwrap().is_some());
-	assert!(file2.try_lock_exclusive().unwrap().is_none());
+	assert!(file2.try_lock_shared_ref().unwrap().is_some());
+	assert!(file2.try_lock_exclusive_ref().unwrap().is_none());
 
 	lock.unlock().unwrap();
 }
@@ -162,7 +162,7 @@ async fn os_test() {
 		.open("target/test.lock")
 		.unwrap();
 
-	assert!(f.try_lock_exclusive().unwrap().is_none());
+	assert!(f.try_lock_exclusive_ref().unwrap().is_none());
 
 	let fd = f.as_descriptor();
 
