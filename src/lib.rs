@@ -59,13 +59,23 @@ pub trait AsyncLockFileExt: AsDescriptor {
 	fn lock_exclusive(self) -> impl Future<Output = std::io::Result<Lock<Self>>> + Send where Self: Sized + 'static;
 
 	/// Try to obtain a shared lock
-	fn try_lock_shared(self) -> std::io::Result<Option<Lock<Self>>> where Self: Sized + 'static {
-		try_lock_shared(self.as_descriptor()).map(|f| f.map(|_| Lock::new(self)))
+	fn try_lock_shared(self) -> std::io::Result<LockResult<Self>> where Self: Sized + 'static {
+		try_lock_shared(self.as_descriptor())
+			.map(|locked| if locked {
+				LockResult::Locked(Lock::new(self))
+			} else {
+				LockResult::Blocking(self)
+			})
 	}
 
 	/// Try to obtain an exclusive lock
-	fn try_lock_exclusive(self) -> std::io::Result<Option<Lock<Self>>> where Self: Sized + 'static {
-		try_lock_exclusive(self.as_descriptor()).map(|f| f.map(|_| Lock::new(self)))
+	fn try_lock_exclusive(self) -> std::io::Result<LockResult<Self>> where Self: Sized + 'static {
+		try_lock_exclusive(self.as_descriptor())
+			.map(|locked| if locked {
+				LockResult::Locked(Lock::new(self))
+			} else {
+				LockResult::Blocking(self)
+			})
 	}
 
 
@@ -77,12 +87,14 @@ pub trait AsyncLockFileExt: AsDescriptor {
 
 	/// Try to obtain a shared lock
 	fn try_lock_shared_ref<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
-		try_lock_shared(self.as_descriptor()).map(|f| f.map(|_| LockRef::new(self)))
+		try_lock_shared(self.as_descriptor())
+			.map(|locked| locked.then(|| LockRef::new(self)))
 	}
 
 	/// Try to obtain an exclusive lock
 	fn try_lock_exclusive_ref<'a>(&'a mut self) -> std::io::Result<Option<LockRef<'a, Self>>> where Self: Sized + 'static {
-		try_lock_exclusive(self.as_descriptor()).map(|f| f.map(|_| LockRef::new(self)))
+		try_lock_exclusive(self.as_descriptor())
+			.map(|locked| locked.then(|| LockRef::new(self)))
 	}
 }
 
@@ -175,6 +187,21 @@ impl<T: AsDescriptor> AsyncLockFileExt for T {
 	}
 }
 
+
+/// Holds either a [Lock] of T, or T itself
+pub enum LockResult<T: AsDescriptor> {
+	Locked(Lock<T>),
+	Blocking(T),
+}
+
+impl<T: AsDescriptor> LockResult<T> {
+	pub fn unwrap(self) -> Lock<T> {
+		match self {
+			Self::Locked(l) => l,
+			_ => panic!("called `LockResult::unwrap()` on a `Blocking` value")
+		}
+	}
+}
 
 /// Guard that holds a reference to a locked file.
 /// 

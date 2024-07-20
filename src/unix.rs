@@ -25,28 +25,28 @@ pub(crate) fn lock_exclusive(file: Descriptor) -> std::io::Result<()> {
 	lock_file(file, LOCK_EX)
 }
 
-pub(crate) fn try_lock_shared(file: Descriptor) -> std::io::Result<Option<()>> {
+pub(crate) fn try_lock_shared(file: Descriptor) -> std::io::Result<bool> {
 	let res = lock_file(file, LOCK_SH | LOCK_NB);
 
 	if let Err(e) = &res {
 		if let ErrorKind::WouldBlock = e.kind() {
-			return Ok(None);
+			return Ok(false);
 		}
 	}
 
-	res.map(|_| Some(()))
+	res.map(|_| true)
 }
 
-pub(crate) fn try_lock_exclusive(file: Descriptor) -> std::io::Result<Option<()>> {
+pub(crate) fn try_lock_exclusive(file: Descriptor) -> std::io::Result<bool> {
 	let res = lock_file(file, LOCK_EX | LOCK_NB);
 
 	if let Err(e) = &res {
 		if let ErrorKind::WouldBlock = e.kind() {
-			return Ok(None);
+			return Ok(false);
 		}
 	}
 
-	res.map(|_| Some(()))
+	res.map(|_| true)
 }
 
 pub(crate) fn unlock(file: Descriptor) -> std::io::Result<()> {

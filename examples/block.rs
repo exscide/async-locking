@@ -5,7 +5,7 @@ use async_locking::AsyncLockFileExt;
 #[cfg_attr(feature = "blocking", async_std::main)]
 async fn main() {
 	#[cfg(feature = "tokio")]
-	let mut file = tokio::fs::File::options()
+	let file = tokio::fs::File::options()
 		.create(true)
 		.write(true)
 		.open("target/test.lock")
@@ -13,7 +13,7 @@ async fn main() {
 		.unwrap();
 
 	#[cfg(any(feature = "async-std", feature = "blocking"))]
-	let mut file = std::fs::File::options()
+	let file = std::fs::File::options()
 		.create(true)
 		.write(true)
 		.open("target/test.lock")

@@ -23,28 +23,28 @@ pub(crate) fn lock_exclusive(file: Descriptor) -> std::io::Result<()> {
 	lock_file(file, LOCKFILE_EXCLUSIVE_LOCK)
 }
 
-pub(crate) fn try_lock_shared(file: Descriptor) -> std::io::Result<Option<()>> {
+pub(crate) fn try_lock_shared(file: Descriptor) -> std::io::Result<bool> {
 	let res = lock_file(file, LOCKFILE_FAIL_IMMEDIATELY);
 
 	if let Err(Some(code)) = res.as_ref().map_err(|e| e.raw_os_error()) {
 		if code == ERROR_LOCK_VIOLATION as i32 {
-			return Ok(None);
+			return Ok(false);
 		}
 	}
 
-	res.map(|_| Some(()))
+	res.map(|_| true)
 }
 
-pub(crate) fn try_lock_exclusive(file: Descriptor) -> std::io::Result<Option<()>> {
+pub(crate) fn try_lock_exclusive(file: Descriptor) -> std::io::Result<bool> {
 	let res = lock_file(file, LOCKFILE_FAIL_IMMEDIATELY | LOCKFILE_EXCLUSIVE_LOCK);
 
 	if let Err(Some(code)) = res.as_ref().map_err(|e| e.raw_os_error()) {
 		if code == ERROR_LOCK_VIOLATION as i32 {
-			return Ok(None);
+			return Ok(false);
 		}
 	}
 
-	res.map(|_| Some(()))
+	res.map(|_| true)
 }
 
 fn lock_file(file: Descriptor, flags: u32) -> Result<(), std::io::Error> {
